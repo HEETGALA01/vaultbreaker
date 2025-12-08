@@ -1,0 +1,23 @@
+# Environment variables (NEVER commit this!)
+.env
+
+# Node modules
+node_modules/
+
+# Data files (generated at runtime)
+players_data.csv
+games_data.csv
+leaderboard_data.json
+email_progress.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

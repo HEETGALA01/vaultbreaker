@@ -1,0 +1,22 @@
+{
+  "name": "vault-breaker",
+  "version": "1.0.0",
+  "description": "Multiplayer Vault Breaker Game - Supports 1000+ concurrent players",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "nodemailer": "^6.9.7",
+    "openai": "^4.20.1",
+    "socket.io": "^4.7.2"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "author": "",
+  "license": "MIT"
+}

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔐 Admin Dashboard - Vault Breaker</title>
+    <link rel="stylesheet" href="admin-styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="login-screen" class="screen active">
+        <div class="login-container">
+            <div class="admin-header">
+                <h1>🔐 ADMIN DASHBOARD</h1>
+                <p class="subtitle">Host Access Only</p>
+            </div>
+            <div class="login-form">
+                <label for="admin-password">Enter Admin Password</label>
+                <input type="password" id="admin-password" placeholder="••••••••" autocomplete="off">
+                <button id="login-btn" class="admin-btn">LOGIN</button>
+                <p id="login-error" class="error-msg hidden">Invalid password!</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard -->
+    <div id="dashboard-screen" class="screen hidden">
+        <!-- Header -->
+        <div class="dashboard-header">
+            <h1>🎮 VAULT BREAKER - HOST DASHBOARD</h1>
+            <button id="logout-btn" class="admin-btn logout">LOGOUT</button>
+        </div>
+
+        <!-- Stats Bar -->
+        <div class="stats-bar">
+            <div class="stat-card">
+                <span class="stat-icon">👥</span>
+                <div class="stat-info">
+                    <span class="stat-value" id="total-players">0</span>
+                    <span class="stat-label">TOTAL PLAYERS</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <span class="stat-icon">🎮</span>
+                <div class="stat-info">
+                    <span class="stat-value" id="active-players">0</span>
+                    <span class="stat-label">ACTIVE PLAYERS</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <span class="stat-icon">🏆</span>
+                <div class="stat-info">
+                    <span class="stat-value" id="completed-games">0</span>
+                    <span class="stat-label">COMPLETED GAMES</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <span class="stat-icon">⏱️</span>
+                <div class="stat-info">
+                    <span class="stat-value" id="avg-score">0</span>
+                    <span class="stat-label">AVERAGE SCORE</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- View Toggle Buttons -->
+            <div class="view-controls">
+                <button id="dashboard-view-btn" class="view-btn active">📊 DASHBOARD VIEW</button>
+                <button id="fullscreen-view-btn" class="view-btn">🏆 LEADERBOARD</button>
+                <button id="players-view-btn" class="view-btn">👥 LIVE PLAYERS</button>
+            </div>        <!-- Dashboard View -->
+        <div id="dashboard-view" class="view-container active">
+            <!-- Main Content -->
+            <div class="dashboard-content">
+                <!-- Live Players Panel -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>🔴 LIVE PLAYERS</h2>
+                        <span class="live-indicator">● LIVE</span>
+                    </div>
+                    <div class="controls">
+                        <button id="kick-all-btn" class="danger-btn">KICK ALL PLAYERS</button>
+                        <button id="refresh-btn" class="admin-btn">REFRESH</button>
+                    </div>
+                    <div id="live-players-list" class="players-list">
+                        <div class="empty-state">No active players</div>
+                    </div>
+                </div>
+
+                <!-- Real-Time Leaderboard Panel -->
+                <div class="panel leaderboard-panel">
+                    <div class="panel-header">
+                        <h2>🏆 ALL PLAYERS LEADERBOARD</h2>
+                        <div class="header-buttons">
+                            <button id="send-emails-btn" class="admin-btn small email-btn">📧 SEND EMAILS</button>
+                            <button id="retry-emails-btn" class="admin-btn small retry-btn hidden">🔄 RETRY FAILED</button>
+                            <button id="stop-emails-btn" class="danger-btn small hidden">⏹️ STOP</button>
+                            <button id="clear-leaderboard-btn" class="danger-btn small">CLEAR ALL</button>
+                        </div>
+                    </div>
+                    
+                    <div id="email-status-message" class="email-status hidden"></div>
+                    <div class="leaderboard-controls">
+                        <label>
+                            <input type="checkbox" id="auto-refresh" checked>
+                            Auto-refresh every 2s
+                        </label>
+                        <span class="leaderboard-info">Players persist until cleared</span>
+                    </div>
+                    <div class="leaderboard-table-header">
+                        <span class="col-rank">RANK</span>
+                        <span class="col-name">CODENAME</span>
+                        <span class="col-email">EMAIL</span>
+                        <span class="col-score">SCORE</span>
+                        <span class="col-vaults">VAULTS OPENED</span>
+                        <span class="col-status">WON/LOST</span>
+                        <span class="col-date">DATE & TIME</span>
+                    </div>
+                    <div id="admin-leaderboard-list" class="leaderboard-list">
+                        <div class="empty-state">No players in leaderboard yet</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Activity Log -->
+            <div class="panel activity-panel">
+                <div class="panel-header">
+                    <h2>📊 ACTIVITY LOG</h2>
+                    <button id="clear-log-btn" class="admin-btn small">CLEAR LOG</button>
+                </div>
+                <div id="activity-log" class="activity-log">
+                    <div class="log-entry system">
+                        <span class="log-time">[SYSTEM]</span>
+                        <span class="log-message">Admin dashboard initialized</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fullscreen Leaderboard View -->
+        <div id="fullscreen-view" class="view-container hidden">
+            <div class="fullscreen-leaderboard">
+                <div class="fullscreen-header">
+                    <h1 class="fullscreen-title">🏆 LEADERBOARD 🏆</h1>
+                    <div class="fullscreen-live-info">
+                        <div class="live-badge">● LIVE</div>
+                        <div class="fullscreen-player-count">
+                            <span id="fullscreen-player-count">0</span> PLAYERS
+                        </div>
+                    </div>
+                </div>
+                <div id="fullscreen-leaderboard-list" class="fullscreen-leaderboard-list">
+                    <div class="empty-state">No players yet...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fullscreen Live Players View -->
+        <div id="players-view" class="view-container hidden">
+            <div class="fullscreen-players">
+                <div class="fullscreen-header">
+                    <h1 class="fullscreen-title">👥 LIVE PLAYERS 👥</h1>
+                    <div class="fullscreen-live-info">
+                        <div class="live-badge">● LIVE</div>
+                        <div class="fullscreen-player-count">
+                            <span id="fullscreen-active-count">0</span> ACTIVE NOW
+                        </div>
+                    </div>
+                </div>
+                <div id="fullscreen-players-list" class="fullscreen-players-list">
+                    <div class="empty-state">No active players...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>

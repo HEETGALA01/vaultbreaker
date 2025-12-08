@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔐 VAULT BREAKER - The Ultimate Heist Game</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <!-- Socket.io for real-time multiplayer -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+    <!-- Particle Background -->
+    <div id="particles"></div>
+    
+    <!-- Glitch Overlay -->
+    <div class="glitch-overlay"></div>
+
+    <!-- Connection Status -->
+    <div id="connection-status" class="connection-status offline">
+        <span class="status-dot offline"></span> CONNECTING...
+    </div>
+
+    <!-- Start Screen -->
+    <div id="start-screen" class="screen active">
+        <div class="screen-wrapper">
+            <div class="screen-container">
+                <!-- Game Title -->
+                <div class="title-container">
+                    <h1 class="glitch-text" data-text="VAULT BREAKER">VAULT BREAKER</h1>
+                    <p class="subtitle">🔓 CRACK THE CODE. STEAL THE GLORY. 🔓</p>
+                </div>
+                
+                <div class="start-content">
+                    <!-- Enter Your Codename -->
+                    <div class="player-input-container">
+                        <label for="player-name">ENTER YOUR CODENAME</label>
+                        <input type="text" id="player-name" placeholder="AGENT_X" maxlength="15" autocomplete="off">
+                    </div>
+                    
+                    <!-- Enter Your Email -->
+                    <div class="player-input-container">
+                        <label for="player-email">ENTER YOUR EMAIL</label>
+                        <input type="email" id="player-email" placeholder="agent@vault.com" autocomplete="off">
+                    </div>
+                    
+                    <!-- Mission Briefing -->
+                    <div class="rules-box">
+                        <h3>⚡ MISSION BRIEFING ⚡</h3>
+                        <ul>
+                            <li>🧩 Vault 1: Riddle Challenge</li>
+                            <li>💎 Vault 2: Diamond Mine Game</li>
+                            <li>😀 Vault 3: Emoji Guess</li>
+                            <li>� Vault 4: Scrambled Words</li>
+                            <li>🧠 Vault 5: General Knowledge</li>
+                            <li>⏱️ You have 3 MINUTES total!</li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Initiate Heist Button -->
+                    <button id="start-btn" class="cyber-btn">
+                        <span>INITIATE HEIST</span>
+                        <div class="btn-glitch"></div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen" class="screen">
+        <!-- Right Side Panel: Timer + Score -->
+        <div class="right-panel">
+            <!-- Timer Box -->
+            <div class="timer-box">
+                <div class="timer-label-top">⏱️ TIME</div>
+                <div id="timer" class="timer-display">03:00</div>
+                <div class="timer-progress-bar">
+                    <div id="timer-progress" class="timer-progress-fill"></div>
+                </div>
+            </div>
+            <!-- Score Box -->
+            <div class="score-box">
+                <div class="score-label">AGENT</div>
+                <div id="hud-player-name" class="player-name-display">---</div>
+                <div class="score-divider"></div>
+                <div class="score-label">SCORE</div>
+                <div id="current-score" class="score-display">0</div>
+                <div class="score-progress-bar">
+                    <div id="score-progress" class="score-progress-fill"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="game-wrapper">
+            <div class="game-container">
+                <!-- Top Bar: 5 Vault Progress Journey -->
+                <div class="vault-journey-bar">
+                    <div class="vault-indicator" data-vault="1">
+                        <div class="vault-icon">🔒</div>
+                        <span>VAULT 1</span>
+                    </div>
+                    <div class="progress-line"></div>
+                    <div class="vault-indicator" data-vault="2">
+                        <div class="vault-icon">🔒</div>
+                        <span>VAULT 2</span>
+                    </div>
+                    <div class="progress-line"></div>
+                    <div class="vault-indicator" data-vault="3">
+                        <div class="vault-icon">🔒</div>
+                        <span>VAULT 3</span>
+                    </div>
+                    <div class="progress-line"></div>
+                    <div class="vault-indicator" data-vault="4">
+                        <div class="vault-icon">🔒</div>
+                        <span>VAULT 4</span>
+                    </div>
+                    <div class="progress-line"></div>
+                    <div class="vault-indicator" data-vault="5">
+                        <div class="vault-icon">🔒</div>
+                        <span>VAULT 5</span>
+                    </div>
+                </div>
+                
+                <!-- Mobile Stats Panel (Timer & Score) - Below 5 vaults, right aligned, only on mobile -->
+                <div class="mobile-stats-panel" id="mobile-stats-panel">
+                    <div class="mobile-timer-box">
+                        <span class="timer-label">⏱️ TIME</span>
+                        <span class="timer-value" id="mobile-timer-display">03:00</span>
+                    </div>
+                    <div class="mobile-score-box">
+                        <span class="score-label">💰</span>
+                        <span class="player-name" id="mobile-player-name">PLAYER</span>
+                        <span class="score-value" id="mobile-score-display">0</span>
+                    </div>
+                </div>
+
+                <!-- Vault Container - Center -->
+                <div class="vault-center-area">
+                    <div id="vault-container" class="vault-container">
+                        <div class="vault-door" id="vault-door">
+                            <div class="vault-number" id="vault-number">VAULT 1</div>
+                            <div class="vault-lock">
+                                <div class="lock-circle">
+                                    <div class="lock-inner"></div>
+                                    <div class="lock-dial"></div>
+                                </div>
+                            </div>
+                            <div class="vault-handle"></div>
+                        </div>
+                        
+                        <div class="vault-content" id="vault-content">
+                            <div id="question-container" class="question-container">
+                                <!-- Dynamic content loaded here based on vault type -->
+                            </div>
+                            
+                            <div id="answer-container" class="answer-section">
+                                <!-- Dynamic answer UI loaded here -->
+                            </div>
+                            
+                            <div id="hint-text" class="hint-text hidden"></div>
+                            <button id="hint-btn" class="cyber-btn hint-btn hidden">
+                                <span>💡 USE HINT (-10 pts)</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Result Popup -->
+        <div id="result-popup" class="result-popup">
+            <div class="result-content">
+                <div id="result-icon" class="result-icon">✅</div>
+                <h2 id="result-text">VAULT CRACKED!</h2>
+                <p id="result-points">+100 POINTS</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- End Screen -->
+    <div id="end-screen" class="screen">
+        <div class="screen-wrapper">
+            <div class="screen-container">
+                <div class="end-content">
+                    <h1 class="end-title" id="end-title">MISSION COMPLETE</h1>
+                    <div class="final-stats">
+                        <div class="stat-card">
+                            <span class="stat-label">FINAL SCORE</span>
+                            <span id="final-score" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">VAULTS CRACKED</span>
+                            <span id="vaults-cracked" class="stat-value">0/5</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">YOUR RANK</span>
+                            <span id="player-rank" class="stat-value">#1</span>
+                        </div>
+                    </div>
+                    
+                    <div class="final-leaderboard">
+                        <h2>🏆 LEADERBOARD 🏆</h2>
+                        <div id="final-leaderboard-list"></div>
+                    </div>
+                    
+                    <button id="play-again" class="cyber-btn">
+                        <span>PLAY AGAIN</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Leaderboard Sidebar -->
+    <div id="live-leaderboard" class="live-leaderboard">
+        <div class="leaderboard-header">
+            <h3>🔴 LIVE RANKINGS</h3>
+            <div class="live-indicator"></div>
+        </div>
+        <div class="live-active-players">
+            <span id="live-active-count">0</span> players online
+        </div>
+        <div id="live-leaderboard-list"></div>
+    </div>
+
+    <script src="questions.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
