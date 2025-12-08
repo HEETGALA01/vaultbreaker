@@ -120,24 +120,16 @@ class AdminDashboard {
     }
 
     initSocket() {
-        // Server URL configuration
-        // When hosted on Render/same server: use current host
-        // When hosted separately (Netlify): use PRODUCTION_SERVER_URL
-        const PRODUCTION_SERVER_URL = 'https://vault-game-1.onrender.com'; // Render server URL
-        
+        // Auto-detect server URL - connect to the same origin that served this page
         let serverUrl;
+        
         if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-            // Local development
+            // Running locally
             serverUrl = `http://${window.location.hostname}:3000`;
-        } else if (window.location.hostname.includes('onrender.com')) {
-            // Hosted on Render - use same origin
-            serverUrl = window.location.origin;
-        } else if (PRODUCTION_SERVER_URL) {
-            // Hosted elsewhere (Netlify) - use production server
-            serverUrl = PRODUCTION_SERVER_URL;
         } else {
-            this.addLog('error', 'No server configured! Set PRODUCTION_SERVER_URL in admin.js');
-            return;
+            // Running on deployed server (Render, etc.)
+            // Connect to the same host that's serving this page
+            serverUrl = window.location.origin;
         }
         
         console.log('Admin connecting to server:', serverUrl);

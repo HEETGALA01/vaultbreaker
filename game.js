@@ -313,30 +313,18 @@ class VaultBreaker {
 
     initSocket() {
         try {
-            // Server URL configuration
-            // When hosted on Render/same server: use current host
-            // When hosted separately (Netlify): use PRODUCTION_SERVER_URL
-            const PRODUCTION_SERVER_URL = 'https://vault-game-1.onrender.com'; // Render server URL
-            
+            // Auto-detect server URL - connect to the same origin that served this page
             let serverUrl;
+            
             if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
                 // Local development
                 serverUrl = `http://${window.location.hostname}:3000`;
-            } else if (window.location.hostname.includes('onrender.com')) {
-                // Hosted on Render - use same origin
-                serverUrl = window.location.origin;
-            } else if (PRODUCTION_SERVER_URL) {
-                // Hosted elsewhere (Netlify) - use production server
-                serverUrl = PRODUCTION_SERVER_URL;
             } else {
-                // No server configured - run in offline mode
-                console.log('No server configured. Running in offline mode.');
-                this.updateConnectionStatus(false);
-                this.offlineMode = true;
-                return;
+                // Production - connect to same server that's serving this page
+                serverUrl = window.location.origin;
             }
             
-            console.log('Connecting to server:', serverUrl);
+            console.log('Game connecting to server:', serverUrl);
             
             this.socket = io(serverUrl, {
                 transports: ['websocket', 'polling'],
