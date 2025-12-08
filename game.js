@@ -336,6 +336,12 @@ class VaultBreaker {
                 console.log('Connected to server!');
                 this.playerId = this.socket.id;
                 this.updateConnectionStatus(true);
+                
+                // If game was already started before socket connected, send the start event now
+                if (this.gameActive && this.playerName) {
+                    console.log('Socket connected after game start - sending game:start now');
+                    this.socket.emit('game:start', { name: this.playerName, email: this.playerEmail });
+                }
             });
 
             this.socket.on('disconnect', () => {
@@ -656,21 +662,28 @@ class VaultBreaker {
         
         this.playSound('start');
         
-        if (this.socket && this.socket.connected) {
-            this.socket.emit('game:start', { name: this.playerName, email: this.playerEmail });
-        }
-
-        document.getElementById('start-screen').classList.add('hidden');
-        document.getElementById('start-screen').classList.remove('active');
-        document.getElementById('game-screen').classList.remove('hidden');
-        document.getElementById('game-screen').classList.add('active');
-        
+        // Set game active BEFORE trying to emit - so socket connect handler knows game started
         this.gameActive = true;
         this.currentVault = 0;
         this.score = 0;
         this.hintsUsed = 0;
         this.timeLeft = 180;
         this.vaultsCompleted = 0; // Reset vaults actually completed
+        
+        // Try to send game:start - if socket not connected yet, the connect handler will send it
+        if (this.socket) {
+            if (this.socket.connected) {
+                console.log('Socket connected - sending game:start immediately');
+                this.socket.emit('game:start', { name: this.playerName, email: this.playerEmail });
+            } else {
+                console.log('Socket not connected yet - game:start will be sent on connect');
+            }
+        }
+
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('start-screen').classList.remove('active');
+        document.getElementById('game-screen').classList.remove('hidden');
+        document.getElementById('game-screen').classList.add('active');
         
         this.updateVaultProgress();
         this.loadVault();
@@ -1396,14 +1409,27 @@ class VaultBreaker {
             this.playSound('fail');
         }
 
-        if (this.socket && this.socket.connected) {
-            this.socket.emit('game:complete', {
-                name: this.playerName,
-                email: this.playerEmail,
-                score: this.score,
-                vaultsCompleted: this.vaultsCompleted, // Send actual completed vaults, not currentVault
-                won: won
-            });
+        // Send game completion to server
+        const gameData = {
+            name: this.playerName,
+            email: this.playerEmail,
+            score: this.score,
+            vaultsCompleted: this.vaultsCompleted,
+            won: won
+        };
+        
+        if (this.socket) {
+            if (this.socket.connected) {
+                console.log('Sending game:complete to server');
+                this.socket.emit('game:complete', gameData);
+            } else {
+                // Socket not connected - try to reconnect and send
+                console.log('Socket not connected - attempting to send game:complete');
+                this.socket.once('connect', () => {
+                    console.log('Reconnected - sending game:complete');
+                    this.socket.emit('game:complete', gameData);
+                });
+            }
         }
 
         this.updateLocalLeaderboard();
