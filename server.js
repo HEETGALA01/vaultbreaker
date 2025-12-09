@@ -14,6 +14,10 @@ const fs = require('fs');
 const nodemailer = require('nodemailer');
 const OpenAI = require('openai');
 
+// MongoDB Integration - Simple & Clean
+const { connectDB, disconnectDB } = require('./db');
+const Player = require('./Player');
+
 // Initialize OpenAI
 let openai = null;
 if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here') {
@@ -622,34 +626,93 @@ function initCSVFiles() {
     }
 }
 
-// Save player login data to CSV
-function savePlayerLogin(socketId, codename, email, ip) {
+// Save player login data to MongoDB (with CSV fallback)
+// Save player login - MongoDB + CSV backup
+async function savePlayerLogin(socketId, codename, email, ip, userAgent = '') {
+    // Always save to CSV first
     const timestamp = new Date().toISOString();
-    // Escape commas and quotes in fields
     const safeName = `"${(codename || '').replace(/"/g, '""')}"`;
     const safeEmail = `"${(email || '').replace(/"/g, '""')}"`;
     const safeIP = `"${(ip || '').replace(/"/g, '""')}"`;
-    
     const row = `${timestamp},${socketId},${safeName},${safeEmail},${safeIP}\n`;
     
     fs.appendFile(PLAYERS_CSV_FILE, row, (err) => {
-        if (err) console.error('Error saving player login:', err);
-        else console.log(`Player login saved: ${codename} (${email})`);
+        if (err) console.error('Error saving to CSV:', err);
     });
+    
+    // Try MongoDB (don't fail if it doesn't work)
+    try {
+        const player = new Player({
+            codename,
+            email,
+            sessionId: socketId,
+            ipAddress: ip,
+            userAgent,
+            loginTime: new Date()
+        });
+        
+        await player.save();
+        console.log(`✅ MongoDB: Player login saved - ${codename}`);
+        return player;
+    } catch (error) {
+        console.log(`📝 CSV: Player login saved - ${codename} (${email})`);
+        return null;
+    }
 }
 
-// Save game completion data to CSV
-function saveGameCompletion(socketId, codename, email, score, vaultsCompleted, won, timeTaken) {
+// Save game completion - MongoDB + CSV backup
+async function saveGameCompletion(socketId, codename, email, score, vaultsCompleted, won, timeTaken, vaultDetails = {}) {
+    // Always save to CSV first
     const timestamp = new Date().toISOString();
     const safeName = `"${(codename || '').replace(/"/g, '""')}"`;
     const safeEmail = `"${(email || '').replace(/"/g, '""')}"`;
-    
-    const row = `${timestamp},${socketId},${safeName},${safeEmail},${score},${vaultsCompleted},${won},${timeTaken}\n`;
+    const wonText = won ? 'Yes' : 'No';
+    const row = `${timestamp},${socketId},${safeName},${safeEmail},${score},${vaultsCompleted},${wonText},${timeTaken}\n`;
     
     fs.appendFile(GAMES_CSV_FILE, row, (err) => {
-        if (err) console.error('Error saving game completion:', err);
-        else console.log(`Game saved: ${codename} - Score: ${score}`);
+        if (err) console.error('Error saving to CSV:', err);
     });
+    
+    // Try MongoDB (don't fail if it doesn't work)
+    try {
+        const player = await Player.findOneAndUpdate(
+            { sessionId: socketId },
+            {
+                $set: {
+                    score,
+                    vaultsCompleted,
+                    won,
+                    timeTaken,
+                    completionTime: new Date(),
+                    vaultDetails
+                }
+            },
+            { new: true }
+        );
+        
+        if (player) {
+            console.log(`✅ MongoDB: Game saved - ${codename} - Score: ${score}`);
+        } else {
+            // Create new if not found
+            const newPlayer = new Player({
+                codename,
+                email,
+                sessionId: socketId,
+                score,
+                vaultsCompleted,
+                won,
+                timeTaken,
+                completionTime: new Date(),
+                vaultDetails
+            });
+            await newPlayer.save();
+            console.log(`✅ MongoDB: New player saved - ${codename}`);
+        }
+        return player;
+    } catch (error) {
+        console.log(`📝 CSV: Game saved - ${codename} - Score: ${score}`);
+        return null;
+    }
 }
 
 // Initialize CSV files on server start
@@ -660,7 +723,7 @@ initCSVFiles();
 // ========================================
 
 function addToLeaderboard(playerData) {
-    // Add new entry with all details
+    // Add to in-memory leaderboard
     leaderboard.push({
         id: playerData.id,
         name: playerData.name,
@@ -809,7 +872,7 @@ io.on('connection', (socket) => {
     });
 
     // Player starts game
-    socket.on('game:start', (data) => {
+    socket.on('game:start', async (data) => {
         const playerData = {
             id: socket.id,
             name: data.name || `Agent_${socket.id.slice(0, 4)}`,
@@ -823,9 +886,10 @@ io.on('connection', (socket) => {
 
         activePlayers.set(socket.id, playerData);
         
-        // Save player login to CSV
+        // Save player login to MongoDB
         const clientIP = socket.handshake.address || socket.request.connection.remoteAddress || 'unknown';
-        savePlayerLogin(socket.id, playerData.name, playerData.email, clientIP);
+        const userAgent = socket.handshake.headers['user-agent'] || '';
+        await savePlayerLogin(socket.id, playerData.name, playerData.email, clientIP, userAgent);
         
         // Broadcast updated player count
         io.emit('players:count', { 
@@ -856,7 +920,7 @@ io.on('connection', (socket) => {
     });
 
     // Player completes game
-    socket.on('game:complete', (data) => {
+    socket.on('game:complete', async (data) => {
         let player = activePlayers.get(socket.id);
         
         // If player not in activePlayers, create them now (handles case where game:start was missed)
@@ -884,15 +948,19 @@ io.on('connection', (socket) => {
         // Calculate time taken
         const timeTaken = Math.round((Date.now() - player.startTime) / 1000);
         
-        // Save game completion to CSV
-        saveGameCompletion(
+        // Extract vault details from data if available
+        const vaultDetails = data.vaultDetails || {};
+        
+        // Save game completion to MongoDB (convert 'Yes'/'No' to boolean)
+        await saveGameCompletion(
             socket.id,
             player.name,
             player.email || data.email || '',
             player.score,
             player.vaults,
-            data.won ? 'Yes' : 'No',
-            timeTaken
+            data.won || false,  // Changed from 'Yes'/'No' to boolean
+            timeTaken,
+            vaultDetails
         );
 
         // Add to permanent leaderboard with all details
@@ -928,14 +996,14 @@ io.on('connection', (socket) => {
             
             // Save to CSV even if they disconnected mid-game
             if (player.score > 0 || player.vaults > 0) {
-                // Save game data to CSV (even partial games)
+                // Save game data (even partial games)
                 saveGameCompletion(
                     socket.id,
                     player.name,
                     player.email || '',
                     player.score,
                     player.vaults || 0,
-                    'Disconnected',
+                    false,  // Changed from 'Disconnected' to boolean false
                     timePlayed
                 );
                 
@@ -1237,8 +1305,12 @@ function getLocalIP() {
     return 'localhost';
 }
 
-server.listen(PORT, HOST, () => {
+server.listen(PORT, HOST, async () => {
     const localIP = getLocalIP();
+    
+    // Connect to MongoDB
+    await connectDB();
+    
     console.log(`
 ╔═══════════════════════════════════════════════════════════════╗
 ║                                                               ║
@@ -1265,9 +1337,25 @@ server.listen(PORT, HOST, () => {
 // GRACEFUL SHUTDOWN
 // ========================================
 
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
     console.log('Server shutting down...');
     io.emit('server:shutdown', { message: 'Server is restarting...' });
+    
+    // Disconnect MongoDB
+    await disconnectDB();
+    
+    server.close(() => {
+        console.log('Server closed');
+        process.exit(0);
+    });
+});
+
+process.on('SIGINT', async () => {
+    console.log('\nReceived SIGINT. Graceful shutdown...');
+    
+    // Disconnect MongoDB
+    await disconnectDB();
+    
     server.close(() => {
         console.log('Server closed');
         process.exit(0);
