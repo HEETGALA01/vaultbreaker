@@ -58,6 +58,31 @@
             object-fit: cover;
         }
 
+        /* Critical iOS fix: Hide video controls */
+        .camera-container video {
+            background: #000;
+        }
+        
+        .camera-container video::-webkit-media-controls {
+            display: none !important;
+        }
+        
+        .camera-container video::-webkit-media-controls-enclosure {
+            display: none !important;
+        }
+        
+        .camera-container video::-webkit-media-controls-panel {
+            display: none !important;
+        }
+        
+        .camera-container video::-webkit-media-controls-play-button {
+            display: none !important;
+        }
+        
+        .camera-container video::-webkit-media-controls-start-playback-button {
+            display: none !important;
+        }
+
         .camera-container canvas {
             display: none;
         }
@@ -428,9 +453,9 @@
         </div>
 
         <div class="camera-container">
-            <video id="camera-feed" autoplay playsinline></video>
-            <canvas id="photo-canvas"></canvas>
-            <img id="captured-image" class="captured-image" alt="Captured face">
+            <video id="camera-feed" autoplay playsinline muted webkit-playsinline></video>
+            <canvas id="photo-canvas" style="display: none;"></canvas>
+            <img id="captured-image" class="captured-image" alt="Captured face" style="display: none;">
             <div class="scan-overlay" id="scan-overlay">
                 <div class="scan-line"></div>
                 <div class="scan-corners"></div>

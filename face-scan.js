@@ -39,20 +39,48 @@ class FaceScan {
         const errorMessage = document.getElementById('error-message');
 
         try {
+            // iOS Safari requires specific video constraints
             this.stream = await navigator.mediaDevices.getUserMedia({
                 video: { 
                     facingMode: 'user',
-                    width: { ideal: 640 },
-                    height: { ideal: 640 }
+                    width: { ideal: 640, max: 1280 },
+                    height: { ideal: 640, max: 1280 }
                 },
                 audio: false
             });
             
+            // Critical for iOS: Set attributes before assigning stream
+            video.setAttribute('playsinline', '');
+            video.setAttribute('autoplay', '');
+            video.setAttribute('muted', '');
+            video.muted = true;
+            video.playsInline = true;
+            
             video.srcObject = this.stream;
             
-            video.onloadedmetadata = () => {
-                video.play();
+            // iOS-compatible video loading
+            video.onloadedmetadata = async () => {
+                try {
+                    // Explicit play for iOS
+                    await video.play();
+                    console.log('Camera started successfully');
+                } catch (playError) {
+                    console.error('Video play error:', playError);
+                    // Retry play after a short delay
+                    setTimeout(async () => {
+                        try {
+                            await video.play();
+                        } catch (retryError) {
+                            console.error('Video play retry failed:', retryError);
+                        }
+                    }, 100);
+                }
             };
+            
+            // Ensure video is ready
+            if (video.readyState >= 2) {
+                await video.play();
+            }
         } catch (err) {
             console.error('Camera error:', err);
             errorMessage.textContent = '📷 Camera access denied. Please allow camera access and refresh the page.';
@@ -78,7 +106,33 @@ class FaceScan {
     }
 
     bindEvents() {
-        document.getElementById('capture-btn').addEventListener('click', () => this.capturePhoto());
+        const captureBtn = document.getElementById('capture-btn');
+        
+        // Disable button initially
+        captureBtn.disabled = true;
+        captureBtn.textContent = '⏳ LOADING CAMERA...';
+        
+        // Enable after camera is ready (iOS needs extra time)
+        setTimeout(() => {
+            const video = document.getElementById('camera-feed');
+            if (video && video.readyState >= 2 && video.videoWidth > 0) {
+                captureBtn.disabled = false;
+                captureBtn.textContent = '📸 CAPTURE FACE';
+            } else {
+                // Retry if not ready
+                setTimeout(() => {
+                    if (video && video.readyState >= 2 && video.videoWidth > 0) {
+                        captureBtn.disabled = false;
+                        captureBtn.textContent = '📸 CAPTURE FACE';
+                    } else {
+                        captureBtn.textContent = '📸 CAPTURE FACE';
+                        captureBtn.disabled = false;
+                    }
+                }, 1000);
+            }
+        }, 1500);
+        
+        captureBtn.addEventListener('click', () => this.capturePhoto());
         document.getElementById('continue-btn').addEventListener('click', () => this.continueToGame());
     }
 
@@ -89,25 +143,60 @@ class FaceScan {
         const captureBtn = document.getElementById('capture-btn');
         const scanOverlay = document.getElementById('scan-overlay');
 
-        // Set canvas size
+        // Ensure video is playing and has valid dimensions
+        if (!video.videoWidth || !video.videoHeight) {
+            console.error('Video not ready');
+            alert('Camera not ready. Please wait a moment and try again.');
+            return;
+        }
+
+        // Set canvas size to match video
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
 
-        // Draw video frame to canvas
-        const ctx = canvas.getContext('2d');
+        // Draw video frame to canvas with iOS-safe method
+        const ctx = canvas.getContext('2d', { willReadFrequently: false });
+        
+        // Clear canvas first (iOS safety)
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw the current video frame
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        // Get image data
-        this.capturedImage = canvas.toDataURL('image/jpeg', 0.8);
+        // Convert to base64 image (JPEG for better iOS compatibility)
+        try {
+            this.capturedImage = canvas.toDataURL('image/jpeg', 0.85);
+        } catch (e) {
+            console.error('Canvas conversion error:', e);
+            // Fallback to PNG if JPEG fails
+            this.capturedImage = canvas.toDataURL('image/png');
+        }
+
+        // Verify image was captured
+        if (!this.capturedImage || this.capturedImage.length < 100) {
+            console.error('Image capture failed');
+            alert('Failed to capture image. Please try again.');
+            return;
+        }
 
         // Show captured image
         capturedImg.src = this.capturedImage;
         capturedImg.style.display = 'block';
+        
+        // Pause and hide video (iOS-specific handling)
+        video.pause();
         video.style.display = 'none';
+        
+        // Remove srcObject to fully release camera
+        video.srcObject = null;
 
-        // Stop camera stream
+        // Stop camera stream completely
         if (this.stream) {
-            this.stream.getTracks().forEach(track => track.stop());
+            this.stream.getTracks().forEach(track => {
+                track.stop();
+                console.log('Camera track stopped:', track.label);
+            });
+            this.stream = null;
         }
 
         // Show scanning animation
